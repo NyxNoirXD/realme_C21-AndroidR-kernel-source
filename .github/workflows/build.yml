@@ -42,11 +42,11 @@ jobs:
           key: ${{ runner.os }}-clang-r353983c-v1
 
       # Cache GCC 4.9
-      - name: Cache GCC 4.19
+      - name: Cache GCC 4.9
         id: cache-gcc
         uses: actions/cache@v4
         with:
-          path: gcc-4.19
+          path: gcc-4.9
           key: ${{ runner.os }}-gcc-4.9-v1
 
       - name: Download Clang
@@ -55,7 +55,7 @@ jobs:
           wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android10-dev/clang-r353983c.tar.gz -O clang.tar.gz
           mkdir clang && tar -xf clang.tar.gz -C clang
 
-      - name: Download GCC 4.19
+      - name: Download GCC 4.9
         if: steps.cache-gcc.outputs.cache-hit != 'true'
         run: |
           wget https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/heads/android10-dev.tar.gz -O gcc-4.9.tar.gz
