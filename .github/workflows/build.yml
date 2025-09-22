@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source
+      - name: Checkout kernel source
         uses: actions/checkout@v4
         with:
           submodules: true
@@ -63,13 +63,11 @@ jobs:
           wget https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-10/+archive/refs/heads/android10-dev.tar.gz -O gcc-10.tar.gz
           mkdir gcc-10 && tar -xf gcc-10.tar.gz -C gcc-10
 
-      # Prepare vendor files for kernel
-      - name: Prepare vendor files
+      # Clone Realme C21 Vendor Source parallel to kernel repo
+      - name: Clone Realme C21 Vendor Source
         run: |
-          mkdir -p vendor/oplus
-          git clone --depth=1 https://github.com/realme-kernel-opensource/realme_C21-AndroidR-vendor-source.git tmp_vendor
-          cp -r tmp_vendor/source/vendor/* vendor/
-          rm -rf tmp_vendor
+          cd $GITHUB_WORKSPACE
+          git clone --depth=1 https://github.com/realme-kernel-opensource/realme_C21-AndroidR-vendor-source.git ../realme_C21-AndroidR-vendor-source
 
       # Set up toolchain PATH
       - name: Set up toolchain PATH
