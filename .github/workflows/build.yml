@@ -1,4 +1,4 @@
-name: Kernel Build
+name: Kernel Build 4.19
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
             libncurses-dev libssl-dev lld llvm make python3 \
             unzip wget xz-utils zip
 
-      # Cache ccache results
+      # Cache ccache
       - name: Cache ccache
         uses: actions/cache@v4
         with:
@@ -33,7 +33,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-ccache-
 
-      # Cache Clang toolchain
+      # Cache Clang
       - name: Cache Clang
         id: cache-clang
         uses: actions/cache@v4
@@ -41,30 +41,42 @@ jobs:
           path: clang
           key: ${{ runner.os }}-clang-r353983c-v1
 
-      # Cache GCC 4.9
-      - name: Cache GCC 4.9
+      # Cache GCC 10
+      - name: Cache GCC 10
         id: cache-gcc
         uses: actions/cache@v4
         with:
-          path: gcc-4.9
-          key: ${{ runner.os }}-gcc-4.9-v1
+          path: gcc-10
+          key: ${{ runner.os }}-gcc-10-v1
 
+      # Download Clang
       - name: Download Clang
         if: steps.cache-clang.outputs.cache-hit != 'true'
         run: |
           wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android10-dev/clang-r353983c.tar.gz -O clang.tar.gz
           mkdir clang && tar -xf clang.tar.gz -C clang
 
-      - name: Download GCC 4.9
+      # Download GCC 10
+      - name: Download GCC 10
         if: steps.cache-gcc.outputs.cache-hit != 'true'
         run: |
-          wget https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/heads/android10-dev.tar.gz -O gcc-4.9.tar.gz
-          mkdir gcc-4.9 && tar -xf gcc-4.9.tar.gz -C gcc-4.9
+          wget https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-10/+archive/refs/heads/android10-dev.tar.gz -O gcc-10.tar.gz
+          mkdir gcc-10 && tar -xf gcc-10.tar.gz -C gcc-10
 
+      # Prepare vendor files for kernel
+      - name: Prepare vendor files
+        run: |
+          mkdir -p vendor/oplus
+          git clone --depth=1 https://github.com/realme-kernel-opensource/realme_C21-AndroidR-vendor-source.git tmp_vendor
+          cp -r tmp_vendor/source/vendor/* vendor/
+          rm -rf tmp_vendor
+
+      # Set up toolchain PATH
       - name: Set up toolchain PATH
         run: |
-          echo "PATH=$PWD/clang/bin:$PWD/gcc-4.9/bin:$PATH" >> $GITHUB_ENV
+          echo "PATH=$PWD/clang/bin:$PWD/gcc-10/bin:$PATH" >> $GITHUB_ENV
 
+      # Set up ccache
       - name: Set up ccache for Clang and GCC
         run: |
           mkdir -p ~/.ccache/bin
@@ -75,9 +87,9 @@ jobs:
           ln -sf $(which ccache) ~/.ccache/bin/aarch64-linux-android-ld
           echo "PATH=$HOME/.ccache/bin:$PATH" >> $GITHUB_ENV
 
+      # Build Kernel
       - name: Build Kernel
         run: |
-          # build metadata
           export KBUILD_BUILD_USER="snowluna"
           export KBUILD_BUILD_HOST="android-build"
           
@@ -87,29 +99,25 @@ jobs:
             ARCH=arm64 \
             O=out \
             CC="clang" \
-            CROSS_COMPILE="${PWD}/gcc-4.9/bin/aarch64-linux-android-" \
+            CROSS_COMPILE="${PWD}/gcc-10/bin/aarch64-linux-android-" \
             CLANG_TRIPLE="aarch64-linux-gnu-"
 
+      # Show ccache stats
       - name: Show ccache stats
         run: ccache -s || true
 
+      # Prepare flashable files for artifact
       - name: Prepare flashable files for artifact
         run: |
-          # Create artifact folder at repo root
           mkdir -p artifact
-
-          # Copy kernel image
           cp out/arch/arm64/boot/Image.gz-dtb artifact/
-
-          # Clone AnyKernel3 and copy its files
           git clone https://github.com/NyxNoirXD/AnyKernel3.git ak
           cp -r ak/* artifact/
-
-          # Read kernel version and export as GitHub env variable
           KVER=$(awk '/^VERSION =/ {v=$3} /^PATCHLEVEL =/ {p=$3} /^SUBLEVEL =/ {s=$3} END {print v"."p"."s}' Makefile)
           echo "KVER=$KVER" >> $GITHUB_ENV
           echo "Kernel version: $KVER"
 
+      # Upload artifact
       - name: Upload flashable artifact
         uses: actions/upload-artifact@v4
         with:
