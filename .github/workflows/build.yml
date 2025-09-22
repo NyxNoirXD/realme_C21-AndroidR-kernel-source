@@ -19,10 +19,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            bc bison build-essential ccache curl flex git \
-            libncurses-dev libssl-dev lld llvm make python3 \
-            unzip wget xz-utils zip
+          sudo apt-get install -y bc bison build-essential ccache curl flex git \
+            libncurses-dev libssl-dev lld llvm make python3 unzip wget xz-utils zip
 
       # Cache ccache
       - name: Cache ccache
@@ -33,35 +31,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-ccache-
 
-      # Cache Clang
-      - name: Cache Clang
-        id: cache-clang
-        uses: actions/cache@v4
-        with:
-          path: clang
-          key: ${{ runner.os }}-clang-r353983c-v1
+      # Download GCC 4.9
+      - name: Download GCC 4.9
+        run: |
+          git clone --depth=1 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 -b android11-release gcc-4.9
 
-      # Cache GCC 10
-      - name: Cache GCC 10
-        id: cache-gcc
-        uses: actions/cache@v4
-        with:
-          path: gcc-10
-          key: ${{ runner.os }}-gcc-10-v1
-
-      # Download Clang
+      # Download Clang (Android 10/11 prebuilt)
       - name: Download Clang
-        if: steps.cache-clang.outputs.cache-hit != 'true'
         run: |
           wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/android10-dev/clang-r353983c.tar.gz -O clang.tar.gz
           mkdir clang && tar -xf clang.tar.gz -C clang
-
-      # Download GCC 10
-      - name: Download GCC 10
-        if: steps.cache-gcc.outputs.cache-hit != 'true'
-        run: |
-          wget https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-10/+archive/refs/heads/android10-dev.tar.gz -O gcc-10.tar.gz
-          mkdir gcc-10 && tar -xf gcc-10.tar.gz -C gcc-10
 
       # Clone Realme C21 Vendor Source parallel to kernel repo
       - name: Clone Realme C21 Vendor Source
@@ -70,22 +49,21 @@ jobs:
           git clone --depth=1 https://github.com/realme-kernel-opensource/realme_C21-AndroidR-vendor-source.git ../realme_C21-AndroidR-vendor-source
 
       # Set up toolchain PATH
-      - name: Set up toolchain PATH
+      - name: Setup Toolchain PATH
         run: |
-          echo "PATH=$PWD/clang/bin:$PWD/gcc-10/bin:$PATH" >> $GITHUB_ENV
+          echo "$GITHUB_WORKSPACE/clang/bin:$GITHUB_WORKSPACE/gcc-4.9/bin:/usr/bin:/bin" >> $GITHUB_PATH
 
       # Set up ccache
-      - name: Set up ccache for Clang and GCC
+      - name: Set up ccache
         run: |
           mkdir -p ~/.ccache/bin
           ln -sf $(which ccache) ~/.ccache/bin/clang
           ln -sf $(which ccache) ~/.ccache/bin/clang++
           ln -sf $(which ccache) ~/.ccache/bin/aarch64-linux-android-gcc
           ln -sf $(which ccache) ~/.ccache/bin/aarch64-linux-android-g++
-          ln -sf $(which ccache) ~/.ccache/bin/aarch64-linux-android-ld
-          echo "PATH=$HOME/.ccache/bin:$PATH" >> $GITHUB_ENV
+          echo "$HOME/.ccache/bin:$PATH" >> $GITHUB_PATH
 
-      # Build Kernel
+      # Build kernel
       - name: Build Kernel
         run: |
           export KBUILD_BUILD_USER="snowluna"
@@ -96,9 +74,9 @@ jobs:
           make -j$(nproc --all) \
             ARCH=arm64 \
             O=out \
-            CC="clang" \
-            CROSS_COMPILE="${PWD}/gcc-10/bin/aarch64-linux-android-" \
-            CLANG_TRIPLE="aarch64-linux-gnu-"
+            CC=clang \
+            CROSS_COMPILE="$GITHUB_WORKSPACE/gcc-4.9/bin/aarch64-linux-android-" \
+            CLANG_TRIPLE=aarch64-linux-gnu-
 
       # Show ccache stats
       - name: Show ccache stats
